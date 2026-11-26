@@ -1,0 +1,66 @@
+<!doctype html>
+<!--
+  The app's own player for a plain video file (15 Nov 2026), used by Akwam on the phone and TV.
+  Loaded in the player frame as /sb-file-player.html?u=<https file>&t=<start seconds>.
+  It plays https files only and runs nothing it is handed.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Player</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+  video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+  #msg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+         color: #bbb; font: 14px system-ui, sans-serif; text-align: center; padding: 24px; }
+</style>
+</head>
+<body>
+<video id="v" controls autoplay playsinline></video>
+<div id="msg">This video could not be played. Try another server.</div>
+<script>
+  (function () {
+    var p = new URLSearchParams(location.search);
+    var u = p.get("u") || "";
+    var t = parseFloat(p.get("t")) || 0;
+    var v = document.getElementById("v");
+    var msg = document.getElementById("msg");
+    if (!/^https:\/\//.test(u)) {
+      msg.style.display = "flex";
+      return;
+    }
+    // The file host drops about one connection in three (measured 15 Nov 2026), so one
+    // failure is not the end: load the file again from the same spot, up to 3 times,
+    // before saying it could not be played.
+    var MAX_TRIES = 3;
+    var tries = 0;
+    var want = t;
+    function start() {
+      if (want > 0) {
+        v.addEventListener("loadedmetadata", function () {
+          try { v.currentTime = want; } catch (e) {}
+        }, { once: true });
+      }
+      v.src = u;
+      var play = v.play();
+      if (play && play.catch) play.catch(function () {});
+    }
+    v.addEventListener("timeupdate", function () {
+      if (v.currentTime > 0) want = v.currentTime;
+    });
+    v.addEventListener("playing", function () { msg.style.display = "none"; });
+    v.addEventListener("error", function () {
+      if (tries >= MAX_TRIES) {
+        msg.style.display = "flex";
+        return;
+      }
+      tries += 1;
+      setTimeout(start, 700 * tries);
+    });
+    start();
+  })();
+</script>
+</body>
+</html>
